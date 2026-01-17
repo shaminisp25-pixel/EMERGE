@@ -1,5 +1,5 @@
-// EMERGE Local Storage Utilities
 import { UserData, MoodEntry, JournalEntry, PetState, UserPreferences, Mood, StickerMood, PetType } from '@/types/emerge';
+import { api } from './api';
 
 const STORAGE_KEY = 'emerge_user_data';
 const AUTH_KEY = 'emerge_auth';
@@ -80,29 +80,40 @@ export const saveUserData = (data: UserData): void => {
 export const updateUserData = (updates: Partial<UserData>): UserData | null => {
   const current = loadUserData();
   if (!current) return null;
-  
+
   const updated = { ...current, ...updates, lastActive: getNow() };
   saveUserData(updated);
   return updated;
 };
 
 // Add mood entry
-export const addMoodEntry = (mood: Mood): MoodEntry | null => {
+export const addMoodEntry = async (mood: Mood): Promise<MoodEntry | null> => {
   const userData = loadUserData();
   if (!userData) return null;
 
   const today = getToday();
-  
+
   // Remove existing entry for today if exists
   userData.moodHistory = userData.moodHistory.filter(e => e.date !== today);
-  
+
   const entry: MoodEntry = {
     id: generateId(),
     date: today,
     mood,
     timestamp: getNow(),
   };
-  
+
+  // Backend integration for analysis
+  const analysis = await api.analyzeReflection({
+    mood_label: mood,
+    reflection_text: `User felt ${mood} today.`, // Default reflection text if not provided
+  });
+
+  if (analysis) {
+    console.log('Backend analysis received:', analysis);
+    // You could update pet state or add analysis metadata to the entry here
+  }
+
   userData.moodHistory.push(entry);
   saveUserData(userData);
   return entry;
@@ -112,7 +123,7 @@ export const addMoodEntry = (mood: Mood): MoodEntry | null => {
 export const getTodayMood = (): MoodEntry | null => {
   const userData = loadUserData();
   if (!userData) return null;
-  
+
   const today = getToday();
   return userData.moodHistory.find(e => e.date === today) || null;
 };
@@ -121,11 +132,11 @@ export const getTodayMood = (): MoodEntry | null => {
 export const getMoodHistory = (days: number = 7): MoodEntry[] => {
   const userData = loadUserData();
   if (!userData) return [];
-  
+
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
   const cutoff = cutoffDate.toISOString().split('T')[0];
-  
+
   return userData.moodHistory
     .filter(e => e.date >= cutoff)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -135,7 +146,7 @@ export const getMoodHistory = (days: number = 7): MoodEntry[] => {
 export const addJournalEntry = (content: string, stickers: StickerMood[]): JournalEntry | null => {
   const userData = loadUserData();
   if (!userData) return null;
-  
+
   const entry: JournalEntry = {
     id: generateId(),
     date: getToday(),
@@ -143,7 +154,7 @@ export const addJournalEntry = (content: string, stickers: StickerMood[]): Journ
     stickers,
     timestamp: getNow(),
   };
-  
+
   userData.journalEntries.push(entry);
   saveUserData(userData);
   return entry;
@@ -153,11 +164,11 @@ export const addJournalEntry = (content: string, stickers: StickerMood[]): Journ
 export const getJournalEntries = (limit?: number): JournalEntry[] => {
   const userData = loadUserData();
   if (!userData) return [];
-  
-  const sorted = userData.journalEntries.sort((a, b) => 
+
+  const sorted = userData.journalEntries.sort((a, b) =>
     b.timestamp.localeCompare(a.timestamp)
   );
-  
+
   return limit ? sorted.slice(0, limit) : sorted;
 };
 
@@ -165,13 +176,13 @@ export const getJournalEntries = (limit?: number): JournalEntry[] => {
 export const updatePetState = (updates: Partial<PetState>): PetState | null => {
   const userData = loadUserData();
   if (!userData) return null;
-  
+
   userData.pet = {
     ...userData.pet,
     ...updates,
     lastInteraction: getNow(),
   };
-  
+
   saveUserData(userData);
   return userData.pet;
 };
@@ -180,9 +191,9 @@ export const updatePetState = (updates: Partial<PetState>): PetState | null => {
 export const interactWithPet = (action: 'pet' | 'feed' | 'play'): PetState | null => {
   const userData = loadUserData();
   if (!userData) return null;
-  
+
   const pet = userData.pet;
-  
+
   switch (action) {
     case 'pet':
       pet.comfort = Math.min(100, pet.comfort + 10);
@@ -197,10 +208,10 @@ export const interactWithPet = (action: 'pet' | 'feed' | 'play'): PetState | nul
       pet.energy = Math.max(0, pet.energy - 5);
       break;
   }
-  
+
   pet.totalInteractions += 1;
   pet.lastInteraction = getNow();
-  
+
   saveUserData(userData);
   return pet;
 };

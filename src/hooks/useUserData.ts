@@ -28,13 +28,13 @@ export const useUserData = () => {
   useEffect(() => {
     const auth = isAuthenticated();
     setIsLoggedIn(auth);
-    
+
     if (auth) {
       const data = loadUserData();
       setUserData(data);
       setNeedsOnboarding(!data?.onboardingComplete);
     }
-    
+
     setLoading(false);
   }, []);
 
@@ -42,7 +42,7 @@ export const useUserData = () => {
   const login = useCallback(() => {
     authLogin();
     setIsLoggedIn(true);
-    
+
     const data = loadUserData();
     setUserData(data);
     setNeedsOnboarding(!data?.onboardingComplete);
@@ -66,8 +66,8 @@ export const useUserData = () => {
   }, []);
 
   // Log mood
-  const logMood = useCallback((mood: Mood) => {
-    addMoodEntry(mood);
+  const logMood = useCallback(async (mood: Mood) => {
+    await addMoodEntry(mood);
     setUserData(loadUserData());
   }, []);
 
